@@ -1,0 +1,126 @@
+# import third library
+import numpy as np  
+import matplotlib.pyplot as plt  
+from scipy.integrate import odeint  
+import math
+from scipy.signal import find_peaks
+
+# deescribe the ODE model
+def sdot(s,t,params):
+    k40, k4, a, k6, k1aaCT, k7 = params 
+    u, v, y = s
+    
+    du = k4*(v-u)*(a+u**2)-k6*u
+    dv = k1aaCT-k6*u
+    dy = k1aaCT-k7*(y-v) # w ~= v
+    ds = [du, dv, dy]
+    return ds
+
+# Parameter set
+k40 = 0.018
+k4 = 180
+a = k40/k4
+k6 = 1
+k1aaCT = 0.015
+k7 = 0.6
+params = [k40, k4, a, k6, k1aaCT, k7]
+
+# Initial conditions
+u0 = 0
+v0 = 0.25
+y0 = 0.25
+s0 = [u0, v0, y0]
+
+# Time observation
+t_start = 0
+t_end = 500
+t_obs = np.linspace(t_start, t_end, t_end*10000)
+
+# Run simulation
+s_obs = odeint(sdot,s0,t_obs,args=(params,) ) 
+du_obs = s_obs[:,0]
+dv_obs = s_obs[:,1]
+dy_obs = s_obs[:,2]
+
+# estimate the period and amplitude
+peaku,_ = find_peaks(du_obs, height=0)
+peaky,_ = find_peaks(dy_obs, height=0)
+troughu, _= find_peaks(-du_obs)
+troughy, _= find_peaks(-dy_obs)
+
+# period
+from scipy.signal import peak_prominences
+pro_pu = peak_prominences(du_obs, peaku)
+distance_pu = t_obs[pro_pu[2][1:]]
+for i in range(0, len(distance_pu)):
+    period_pu = distance_pu[i]-distance_pu[i-1]
+    print (period_pu, end=' , ')
+
+pro_py = peak_prominences(dy_obs, peaky)
+distance_py = t_obs[pro_py[2][1:]]
+for i in range(0, len(distance_py)):
+    period_py = distance_py[i]-distance_py[i-1]
+    print (period_py, end=' , ')
+
+pro_tu = peak_prominences(du_obs, troughu)
+distance_tu = t_obs[pro_tu[2][1:]]
+for i in range(0, len(distance_tu)):
+    period_tu = distance_tu[i]-distance_tu[i-1]
+    print (period_tu, end=' , ')
+
+pro_ty = peak_prominences(dy_obs, troughy)
+distance_ty = t_obs[pro_ty[2][1:]]
+for i in range(0, len(distance_ty)):
+    period_ty = distance_ty[i]-distance_ty[i-1]
+    print (period_ty, end=' , ')
+
+#amplitude
+print ('u amplitude')
+for i in range(0,5):
+    ampu = du_obs[peaku[i]]-du_obs[troughu[i]]
+    print (ampu, end=' , ')
+print ('y amplitude')
+for i in range(0,5):
+    ampy = dy_obs[peaky[i]]-dy_obs[troughy[i]]
+    print (ampy, end=' , ')
+
+#period function
+for i in range(0,4):
+    period = t_obs[peaku[i+1]]-t_obs[peaku[i]]
+    print (period)
+
+# figures output
+import matplotlib.font_manager as font_manager
+fig = plt.figure(figsize=(12, 8), dpi=300)
+ax = fig.add_subplot(1,1,1)
+plt.tick_params(which='both',top=True,bottom=True,left=True,right=True)
+plt.yticks(fontproperties='Helvetica', size=14, weight='normal')
+plt.xticks(fontproperties='Helvetica', size=14, weight='normal')
+ax.minorticks_on() #turn on sub-tick
+plt.grid(c='gainsboro',linestyle='--')
+plt.rcParams['xtick.direction']='in' # tick direction
+plt.rcParams['ytick.direction']='in'
+ax.set_xlabel('Time (min)',fontproperties='Helvetica', size=16, weight='normal')
+ax.set_ylabel('Concentration (a.u.)',fontproperties='Helvetica', size=16, weight='normal')
+ax.set_title('')
+ax.plot(t_obs, du_obs, '-',label='Cyclin B/Cdk1',color='r', linewidth=1.8)
+ax.plot(t_obs, dy_obs, '-',label='Cyclin',color='k', linewidth=1.7)
+ax.plot(t_obs, dCdc20_obs, '-',label='Cdc20',color='firebrick', linewidth=1.8)
+ax.plot(t_obs[peake], dMe_obs[peake],"xk")
+ax.plot(t_obs[peakb], dMb_obs[peakb], "xr")
+ax.plot(t_obs[troughe], dMe_obs[troughe],"vk")
+ax.plot(t_obs[troughb], dMb_obs[troughb],"^r")
+ax.set_xticks(np.arange(0,101,20))
+ax.set_yticks(np.arange(0,0.41,0.1))
+ax.set_xlim(0,100)
+ax.set_ylim(-0.01,0.4)
+ax.spines['right'].set_linewidth(1)
+ax.spines['top'].set_linewidth(1)
+ax.spines['left'].set_linewidth(1)
+ax.spines['bottom'].set_linewidth(1)
+font = font_manager.FontProperties(family='Helvetica',
+                                   weight='normal',
+                                   style='normal', size=14)
+ax.legend(prop=font, frameon=True, loc='best',edgecolor='k',facecolor='w')
+plt.annotate('PF pattern',xy=(120,0.9),xycoords='data',textcoords='data',xytext=(+123.5,+1.12),fontsize=16,weight='normal',family='Helvetica')
+plt.savefig('Figure name.png',dpi=300)
