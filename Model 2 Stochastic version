@@ -1,0 +1,241 @@
+from numpy.random import rand
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import poisson
+
+#initial condition
+a,u = 1,0.3
+Cdc20tot,E2Ftot,GF,Metot,Matot,Mbtot = 200.0,200.0,1,200.0,200.0,200.0
+Cdc20totD,E2FtotD,GFD,MetotD,MatotD,MbtotD = 1,1,1,1,1,1
+Kdd,Kgf = 0.1,0.1
+K = 0.005
+Kie,Vdd,Vsd = 0.2,0.245,0.175
+V1Cdc20,V2Cdc20 = 1.8,0.6
+V1e2f,V2e2f = 0.4,0.7
+V1Me = 1.1
+V2Me = 1.6
+V1Ma,V2Ma = 0.6,0.6
+V1Mb = 1
+V2Mb = 0.8
+b1, b2,Kib = 1, 1, 1000
+Omega = 200
+
+# Define the model
+stochiometry = [+1, -1]
+def propMd(Md):
+    return [Vsd*Omega*GF*Omega/(Kgf*Omega+GF*Omega)*u,Vdd*Omega*Md/(Kdd*Omega+Md)*u]
+def propE2F(E2F,Md,Me,Ma):
+    return [u*V1e2f*(E2Ftot-E2F)/(K*Omega+E2Ftot-E2F)*(Md+Me),u*V2e2f*E2F/(K*Omega+E2F)*Ma]
+def propMe(E2F,Me,Ma):
+    return [u*V1Me/Omega*E2F*(a*Omega+b1*Me)*(Metot-Me)/(K*Omega+Metot-Me),u*V2Me*Ma*Me/(K*Omega+Me)]
+def propMa(E2F,Ma,Cdc20):
+    return [u*V1Ma*E2F*(Matot-Ma)/(K*Omega+Matot-Ma),u*V2Ma*Cdc20*Ma/(K*Omega+Ma)]
+def propMb(Ma,Mb,Me,Cdc20):
+    return [u*V1Mb/Omega*Ma*(a*Omega+b2*Mb)*Kie*Omega/(Kie*Omega+Me)*(Mbtot-Mb)/(K*Omega+Mbtot-Mb),u*V2Mb*Kib*Omega/(Kib*Omega+Mb)*Cdc20*Mb/(K*Omega+Mb)]
+def propCdc20(Mb,Cdc20):
+    return [u*V1Cdc20*Mb*(Cdc20tot-Cdc20)/(K*Omega+Cdc20tot-Cdc20),u*V2Cdc20*Omega*Cdc20/(K*Omega+Cdc20)]
+def reactionTimesMd(Md):
+    a = propMd(Md)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def reactionTimesE2F(E2F,Md,Me,Ma):
+    a = propE2F(E2F,Md,Me,Ma)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def reactionTimesMe(E2F,Me,Ma):
+    a = propMe(E2F,Me,Ma)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def reactionTimesMa(E2F,Ma,Cdc20):
+    a = propMa(E2F,Ma,Cdc20)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def reactionTimesMb(Ma,Mb,Me,Cdc20):
+    a = propMb(Ma,Mb,Me,Cdc20)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def reactionTimesCdc20(Mb,Cdc20):
+    a = propCdc20(Mb,Cdc20)
+    aInv = [1/s if s>0 else np.inf for s in a]
+    return -np.log(rand(2))*aInv
+def ssaMd(Md, tIn, tOut):
+    t = tIn    
+    while t < tOut:
+        rt = reactionTimesMd(Md)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)  
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            Md += stochiometry[idx]
+    return Md
+def ssaE2F(E2F,Md,Me,Ma, tIn, tOut):
+    t = tIn    
+    while t < tOut:
+        rt = reactionTimesE2F(E2F,Md,Me,Ma)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)        
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            E2F += stochiometry[idx]
+    return E2F
+def ssaMe(Me,E2F,Ma, tIn, tOut):
+    t = tIn 
+    while t < tOut:
+        rt = reactionTimesMe(E2F,Me,Ma)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)        
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            Me += stochiometry[idx]
+    return Me
+def ssaMa(Ma,E2F,Cdc20, tIn, tOut):
+    t = tIn
+    while t < tOut:
+        rt = reactionTimesMa(E2F,Ma,Cdc20)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)        
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            Ma += stochiometry[idx]
+    return Ma
+def ssaMb(Mb,Ma,Me,Cdc20, tIn, tOut):
+    t = tIn    
+    while t < tOut:
+        rt = reactionTimesMb(Ma,Mb,Me,Cdc20)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            Mb += stochiometry[idx]
+    return Mb
+def ssaCdc20(Cdc20,Mb, tIn, tOut):
+    t = tIn   
+    while t < tOut:
+        rt = reactionTimesCdc20(Mb,Cdc20)
+        #first reaction time
+        tau = np.min(rt)
+        #first reaction index
+        idx = np.argmin(rt)
+        
+        if t+tau>tOut:
+            t = tOut
+        else:
+            t += tau
+            Cdc20 += stochiometry[idx]
+    return Cdc20
+
+# run the simulation
+steps = 1300
+cycles = 140
+dt = 0.01
+t = 0.
+Cdc20,E2F,Me,Ma,Mb,Md = 0.0,0.0,0.0,0.0,0.0,0.0
+
+Md_box = [Md]
+E2F_box = [E2F]
+Ma_box = [Ma]
+Me_box = [Me]
+Mb_box = [Mb]
+Cdc20_box = [Cdc20]
+time = [t]
+for i in range(cycles):
+    for j in range(steps):
+        Md = ssaMd(Md, t, t+dt)
+        E2F = ssaE2F(E2F,Md,Me,Ma, t, t+dt)
+        Me = ssaMe(Me,E2F,Ma, t, t+dt)
+        Ma = ssaMa(Ma,E2F,Cdc20, t, t+dt)
+        Mb = ssaMb(Mb,Ma,Me,Cdc20, t, t+dt)
+        Cdc20 = ssaCdc20(Cdc20,Mb, t, t+dt)
+        t = t+dt
+        time.append(t)
+        Md_box.append(Md)
+        E2F_box.append(E2F)
+        Me_box.append(Me)
+        Ma_box.append(Ma)
+        Mb_box.append(Mb)
+        Cdc20_box.append(Cdc20)
+
+# Plot 1
+import matplotlib.font_manager as font_manager
+fig = plt.figure(figsize=(12, 8), dpi=300)
+axs = fig.add_subplot(1,1,1)
+axs.tick_params(which='both',top=True,bottom=True,left=True,right=True)
+plt.yticks(fontproperties='Helvetica', size=14, weight='normal')
+plt.xticks(fontproperties='Helvetica', size=14, weight='normal')
+plt.rcParams['xtick.direction']='in' # tick direction
+plt.rcParams['ytick.direction']='in'
+plt.grid(c='gainsboro',linestyle='--')
+axs.minorticks_on() #turn on sub-tick
+axs.set_xlabel('Time (h)',fontproperties='Helvetica', size=16, weight='normal')
+axs.set_ylabel('Cyclin E/Cdk2'+'\n'+'and cyclin B/Cdk1',fontproperties='Helvetica', size=16, weight='normal')
+#axs.plot(Md_box,'-',label='Md',color='r', linewidth=1.6)
+#axs.plot(E2F_box,'-',label='E2F',color='b', linewidth=1.6)
+#axs.plot(time,Ma_box,'-',label='Cyclin A/Cdk2',color='g', linewidth=1.6)
+axs.plot(time,Me_box,'-',label='Cyclin E/Cdk2',color='k', linewidth=1.6)
+axs.plot(time,Mb_box,'-',label='Cyclin B/Cdk1',color='#4169E1', linewidth=1.6)
+#axs.plot(Cdc20_box,'-',label='Cdc20',color='c', linewidth=1.6)
+#axs.plot(Ma_box,Mb_box,'-',color='k', linewidth=1.6)
+#axs.plot(dMa_obs[300000:], dMb_obs[300000:], '-',color='r', linewidth=1.6)
+axs.set_xlim(120,300)
+axs.set_ylim(-5,250)
+axs.set_xticks(np.arange(120,301,60))
+axs.set_yticks(np.arange(0,251,50))
+axs.spines['right'].set_linewidth(1)
+axs.spines['top'].set_linewidth(1)
+axs.spines['left'].set_linewidth(1)
+axs.spines['bottom'].set_linewidth(1)
+font = font_manager.FontProperties(family='Helvetica',
+                                   weight='normal',
+                                   style='normal', size=14)
+axs.legend(prop=font, frameon=True, loc='best',edgecolor='k',facecolor='w')
+plt.annotate('1 PF on G1/S & 1 PF on G2/M via Cdc25',xy=(120,240),xycoords='data',textcoords='data',xytext=(+123.5,+234),fontsize=16,weight='normal',family='Helvetica')
+plt.savefig('stochastic strong time-B no PF.png',dpi=300)
+
+# Plot 2
+import matplotlib.font_manager as font_manager
+fig = plt.figure(figsize=(12, 8), dpi=300)
+axs = fig.add_subplot(1,1,1)
+axs.tick_params(which='both',top=True,bottom=True,left=True,right=True)
+plt.yticks(fontproperties='Helvetica', size=14, weight='normal')
+plt.xticks(fontproperties='Helvetica', size=14, weight='normal')
+plt.rcParams['xtick.direction']='in' # tick direction
+plt.rcParams['ytick.direction']='in'
+plt.grid(c='gainsboro',linestyle='--')
+axs.minorticks_on() #turn on sub-tick
+axs.set_xlabel('Cyclin A/Cdk2',fontproperties='Helvetica', size=16, weight='normal')
+axs.set_ylabel('Cyclin E/Cdk2'+'\n'+'and cyclin B/Cdk1',fontproperties='Helvetica', size=16, weight='normal')
+axs.plot(Ma_box,Mb_box,'-',label='Cyclin B/Cdk1',color='#4169E1', linewidth=1.6)
+axs.set_xlim(120,300)
+axs.set_ylim(-5,250)
+axs.set_xticks(np.arange(120,301,60))
+axs.set_yticks(np.arange(0,251,50))
+axs.spines['right'].set_linewidth(1)
+axs.spines['top'].set_linewidth(1)
+axs.spines['left'].set_linewidth(1)
+axs.spines['bottom'].set_linewidth(1)
+font = font_manager.FontProperties(family='Helvetica',
+                                   weight='normal',
+                                   style='normal', size=14)
+axs.legend(prop=font, frameon=True, loc='best',edgecolor='k',facecolor='w')
+plt.annotate('1 PF on G1/S & 1 PF on G2/M via Cdc25',xy=(120,240),xycoords='data',textcoords='data',xytext=(+123.5,+234),fontsize=16,weight='normal',family='Helvetica')
+plt.savefig('stochastic strong A-B no PF.png',dpi=300)
