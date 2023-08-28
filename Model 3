@@ -1,0 +1,390 @@
+import numpy as np  
+import matplotlib.pyplot as plt  
+from scipy.integrate import odeint  
+import math
+from scipy.signal import find_peaks
+
+# Define functions
+def BB(A1,A2,A3,A4):
+    B = A2-A1+A3*A2+A4*A1
+    return float(B)
+def GK(A1,A2,A3,A4):
+    G = 2.0*A4*A1/(BB(A1,A2,A3,A4)+(BB(A1,A2,A3,A4)**2.0-4.0*(A2-A1)*A4*A1)**0.5)
+    return float(G)
+def Mass_u5f_(k1):
+    Mass_u5f = k1
+    return Mass_u5f
+def Mass_0001(k1,S1):
+    Mass_0001 = k1*S1
+    return Mass_0001
+def Mass_0002(k1,S1,S2):
+    Mass_0002 = k1*S1*S2
+    return Mass_0002
+def Michaelis(M1,J1,k1,S1):
+    Michaelis = k1*S1*M1/(J1+S1)
+    return Michaelis
+
+# initial condition
+CycA0 = 0.004432679622650635 
+CycB0 = 0.13166304995159922 
+CycE0 = 0.025029560102069612 
+APCP0 = 0.5564843241089278 
+BCKI0 = 0.0 
+Cdc20A0 = 0.5809898766395526 
+Cdc20i0 = 0.0778509831712664 
+Cdh10 = 0.9993513941326988 
+CKI0 = 0.5954700238991052 
+Mass0 = 0.9216731323458548 
+pB0 = 0.015011778948422422 
+pBCKI0 = 0.0 
+TriA0 = 0.011881386509307678 
+TriE0 = 0.16804738791829524 
+Wee10 = 0.9998806676825085
+#CycD
+CycD0=0.05
+#CycE
+kse_p=0.01
+kse_pp=0.18
+kde_p=0.01
+kdea_pp=0.5
+kdeb_pp=0.5
+kdee_pp=0.1
+kasse=50.0
+kdisse=1.0
+#TFE
+katf_p=0.0
+katfa_pp=0.2
+katfd_pp=3.0
+katfe_pp=0.5
+kitf_p=0.25
+kitfa_pp=0.1
+kitfb_pp=0.1
+Jatf=0.01
+Jitf=0.01
+#CycB (not complexed with p27)
+ksb_p=0.01
+ksb_pp=0.03
+kdb_p=0.0050
+kdbh_pp=2.0
+kdbc_pp=0.1
+kassb=0.0
+kdissb=0.0
+kwee_p=0.02
+kwee_pp=0.2
+k25_p=0.01
+k25_pp=5
+#TFB=MCM
+kafb=1.0
+kifb=0.1
+Jafb=0.1
+Jifb=0.1
+#CycA
+ksa_p=0.0
+ksa_pp=0.025
+kda_p=0.020
+kda_pp=2.0
+kda_ppp=0.0
+kassa=25.0
+kdissa=1.0
+#CKI=p27
+ksi_p=1.8
+ksi_pp=0.0
+kdi_p=0.8
+kdia_pp=5.0
+kdib_pp=5.0
+kdid_pp=0.0
+kdie_pp=5.0
+k14di=0.0
+#TFI=none
+kafi=88.0
+kifi_p=88.0
+kifib_pp=88.0
+Jafi=88.0
+Jifi=88.0
+#APC activation
+kaie=0.07
+kiie=0.18
+Jaie=0.01
+Jiie=0.01
+#Cdc20
+ks20_p=0.0
+ks20_pp=0.15
+n20=1.0
+J20=1
+kd20=0.15
+ka20=0.5
+ki20=0.25
+Ja20=0.0050
+Ji20=0.0050
+#Cdh1
+kah1_p=0.18
+kah1_pp=3.5
+kih1_p=0.0
+kih1a_pp=0.2
+kih1b_pp=1.0
+kih1d_pp=0.0
+kih1e_pp=0.1
+Jah1=0.01
+Jih1=0.01
+#Wee1-Cdc25
+Jawee=0.01 
+Jiwee=0.01  
+ka25_p=0
+ka25_pp=1
+ki25_p=0.3
+ki25_pp=0
+Ja25=0.1
+Ji25=0.1
+kawee= 0.6  # control the growing back speed
+kiwee= 0.03 # control the decreasing speed
+APCT=1.0
+Cdh1T=1.0
+Wee1T=1.0
+cell=1
+KEZ=0.2
+mu=0.004951*0.583333
+MaxMass=10000
+
+# initial params
+def iniparams():
+    #global Wee1,Wee1_check
+    preMPF=pB0+pBCKI0
+    TriB=BCKI0+pBCKI0
+    CycBT=CycB0+pB0+BCKI0+pBCKI0
+    CycAT=CycA0+TriA0
+    CycET=CycE0+TriE0
+    CycD=CycD0*Mass0
+    CKIT=CKI0+BCKI0+pBCKI0+TriA0+TriE0
+    Cdc20T=Cdc20i0+Cdc20A0
+    Cdc14=Cdc20A0
+    Vwee=kwee_p+kwee_pp*Wee10
+    Cdc25=GK(ka25_p+ka25_pp*CycB0,ki25_p+ki25_pp*Cdc14,Ja25,Ji25)
+    V25=k25_p+k25_pp*Cdc25
+    TFB=GK(kafb*CycB0,kifb,Jafb,Jifb)
+    Vatf=katf_p+katfa_pp*CycA0+katfe_pp*CycE0+katfd_pp*CycD
+    Vitf=kitf_p+kitfa_pp*CycA0+kitfb_pp*CycB0
+    TFE=GK(Vatf,Vitf,Jatf,Jitf)
+    TFI=GK(kafi*Cdc14,kifi_p+kifib_pp*CycB0,Jafi,Jifi)
+    Vsb=(ksb_p+ksb_pp*TFB)*Mass0
+    Vsa=(ksa_p+ksa_pp*TFE)*Mass0
+    Vse=(kse_p+kse_pp*TFE)*Mass0
+    Vah1=kah1_p+kah1_pp*Cdc14
+    Vih1=kih1_p+kih1a_pp*CycA0+kih1b_pp*CycB0+kih1e_pp*CycE0+kih1d_pp*CycD
+    Vdb=kdb_p+kdbh_pp*Cdh10+kdbc_pp*Cdc20A0
+    Vda=kda_p+(kda_pp+kda_ppp)*Cdc20A0+kda_ppp*Cdc20i0
+    Vde=kde_p+kdee_pp*CycE0+kdea_pp*CycA0+kdeb_pp*CycB0
+    Vsi=ksi_p+ksi_pp*TFI
+    Vdi=(kdi_p+kdia_pp*CycA0+kdib_pp*CycB0+kdie_pp*CycE0+kdid_pp*CycD)/(1.0+k14di*Cdc14)
+    APC=(-(APCP0-APCT)/1)
+    Cdh1i=(-(Cdh10-Cdh1T)/1)
+    Wee1i=(-(Wee10-Wee1T)/1)
+    dCycA=(-(kassa*CKI0*CycA0)+(kdissa*TriA0)+(Vdi*TriA0)+(Vsa)-(Vda*CycA0))*10
+    dCycB=((Vsb)-(Vdb*CycB0)+(V25*pB0)-(Vwee*CycB0)-(kassb*CycB0*CKI0)+(kdissb*BCKI0)+(Vdi*BCKI0))*10
+    dCycE=(-(kasse*CKI0*CycE0)+(kdisse*TriE0)+(Vdi*TriE0)+(Vse)-(Vde*CycE0))*10
+    dAPCP=((Michaelis(CycB0,Jaie,kaie,APC))-(Michaelis(1.0,Jiie,kiie,APCP0)))*10
+    dBCKI=((kassb*CycB0*CKI0)-(kdissb*BCKI0)+(V25*pBCKI0)-(Vwee*BCKI0)-(Vdb*BCKI0)-(Vdi*BCKI0))*10
+    dCdc20A=((Michaelis(APCP0,Ja20,ka20,Cdc20i0))-(Michaelis(1.0,Ji20,ki20,Cdc20A0))-(kd20*Cdc20A0))*10
+    dCdc20i=((ks20_p+ks20_pp*CycB0**n20/(J20**n20+CycB0**n20))-(kd20*Cdc20i0)-(Michaelis(APCP0,Ja20,ka20,Cdc20i0))+(Michaelis(1.0,Ji20,ki20,Cdc20A0)))*10
+    dCdh1=((Michaelis(Vah1,Jah1,1.0,Cdh1i))-(Michaelis(Vih1,Jih1,1.0,Cdh10)))*10
+    dCKI=(-(kassb*CycB0*CKI0)+(kdissb*BCKI0)-(kassb*pB0*CKI0)+(kdissb*pBCKI0)+(Vdb*BCKI0)+(Vdb*pBCKI0)+(Vsi)-(Vdi*CKI0)-(kassa*CKI0*CycA0)+(kdissa*TriA0)+(Vda*TriA0)-(kasse*CKI0*CycE0)+(kdisse*TriE0)+(Vde*TriE0))*10
+    dMass=(mu*Mass0*(1-Mass0/MaxMass))*10
+    dpB=(-(V25*pB0)+(Vwee*CycB0)-(Vdb*pB0)-(kassb*pB0*CKI0)+(kdissb*pBCKI0)+(Vdi*pBCKI0))*10
+    dpBCKI=((kassb*pB0*CKI0)-(kdissb*pBCKI0)-(V25*pBCKI0)+(Vwee*BCKI0)-(Vdb*pBCKI0)-(Vdi*pBCKI0))*10
+    dTriA=((kassa*CKI0*CycA0)-(kdissa*TriA0)-(Vdi*TriA0)-(Vda*TriA0))*10
+    dTriE=((kasse*CKI0*CycE0)-(kdisse*TriE0)-(Vdi*TriE0)-(Vde*TriE0))*10
+    dWee1=((Michaelis(Cdc14,Jawee,kawee,Wee1i))-(Michaelis(CycB0,Jiwee,kiwee,Wee10)))*10*1
+    params1 = [kassa,kdissa,Vdi,Vsa,Vda,Vsb,Vdb,V25,Vwee,kassb,kdissb,kasse,kdisse,Vse,Vde,Jaie,kaie,APC,Jiie,kiie,Ja20,ka20,Ji20,ki20,kd20,ks20_p,ks20_pp,n20,J20,Vah1,Jah1,Cdh1i,Vih1,Jih1,Vsi,mu,MaxMass]
+    #Wee1_check=Wee1
+    return params1
+params1 = iniparams()
+
+# Define the model
+def sdot(s,t,params):
+    global kassa,kdissa,Vdi,Vsa,Vda,Vsb,Vdb,V25,Vwee,kassb,kdissb,kasse,kdisse,Vse,Vde,Jaie,kaie,APC,Jiie,kiie,Ja20,ka20,Ji20,ki20,kd20,ks20_p,ks20_pp,n20,J20,Vah1,Jah1,Cdh1i,Vih1,Jih1,Vsi,mu,MaxMass,CycB,dCycB,CKIT,Wee1,CycA,CycB,CycE,APCP,Cdc20A,Cdh1,CKI,Cdc20i,Mass,pB,pBCKI,TriA,TriE,BCKI,Wee1_check,Wee1_box
+    kassa,kdissa,Vdi,Vsa,Vda,Vsb,Vdb,V25,Vwee,kassb,kdissb,kasse,kdisse,Vse,Vde,Jaie,kaie,APC,Jiie,kiie,Ja20,ka20,Ji20,ki20,kd20,ks20_p,ks20_pp,n20,J20,Vah1,Jah1,Cdh1i,Vih1,Jih1,Vsi,mu,MaxMass = params 
+    CycA,CycB,CycE,APCP,BCKI,Cdc20A,Cdc20i,Cdh1,CKI,Mass,pB,pBCKI,TriA,TriE,Wee1=s
+    preMPF=pB+pBCKI
+    TriB=BCKI+pBCKI
+    CycBT=CycB+pB+BCKI+pBCKI
+    CycAT=CycA+TriA
+    CycET=CycE+TriE
+    CycD=CycD0*Mass
+    CKIT=CKI+BCKI+pBCKI+TriA+TriE
+    Cdc20T=Cdc20i+Cdc20A
+    Cdc14=Cdc20A
+    Vwee=kwee_p+kwee_pp*Wee1
+    Cdc25=GK(ka25_p+ka25_pp*CycB,ki25_p+ki25_pp*Cdc14,Ja25,Ji25)
+    V25=k25_p+k25_pp*Cdc25
+    TFB=GK(kafb*CycB,kifb,Jafb,Jifb)
+    Vatf=katf_p+katfa_pp*CycA+katfe_pp*CycE+katfd_pp*CycD
+    Vitf=kitf_p+kitfa_pp*CycA+kitfb_pp*CycB
+    TFE=GK(Vatf,Vitf,Jatf,Jitf)
+    TFI=GK(kafi*Cdc14,kifi_p+kifib_pp*CycB,Jafi,Jifi)
+    Vsb=(ksb_p+ksb_pp*TFB)*Mass
+    Vsa=(ksa_p+ksa_pp*TFE)*Mass
+    Vse=(kse_p+kse_pp*TFE)*Mass
+    Vah1=kah1_p+kah1_pp*Cdc14
+    Vih1=kih1_p+kih1a_pp*CycA+kih1b_pp*CycB+kih1e_pp*CycE+kih1d_pp*CycD
+    Vdb=kdb_p+kdbh_pp*Cdh1+kdbc_pp*Cdc20A
+    Vda=kda_p+(kda_pp+kda_ppp)*Cdc20A+kda_ppp*Cdc20i
+    Vde=kde_p+kdee_pp*CycE+kdea_pp*CycA+kdeb_pp*CycB
+    Vsi=ksi_p+ksi_pp*TFI
+    Vdi=(kdi_p+kdia_pp*CycA+kdib_pp*CycB+kdie_pp*CycE+kdid_pp*CycD)/(1.0+k14di*Cdc14)
+    APC=(-(APCP-APCT)/1)
+    Cdh1i=(-(Cdh1-Cdh1T)/1)
+    Wee1i=(-(Wee1-Wee1T)/1)
+    dCycA=(-(kassa*CKI*CycA)+(kdissa*TriA)+(Vdi*TriA)+(Vsa)-(Vda*CycA))*10
+    dCycB=((Vsb)-(Vdb*CycB)+(V25*pB)-(Vwee*CycB)-(kassb*CycB*CKI)+(kdissb*BCKI)+(Vdi*BCKI))*10
+    dCycE=(-(kasse*CKI*CycE)+(kdisse*TriE)+(Vdi*TriE)+(Vse)-(Vde*CycE))*10
+    dAPCP=((Michaelis(CycB,Jaie,kaie,APC))-(Michaelis(1.0,Jiie,kiie,APCP)))*10
+    dBCKI=((kassb*CycB*CKI)-(kdissb*BCKI)+(V25*pBCKI)-(Vwee*BCKI)-(Vdb*BCKI)-(Vdi*BCKI))*10
+    dCdc20A=((Michaelis(APCP,Ja20,ka20,Cdc20i))-(Michaelis(1.0,Ji20,ki20,Cdc20A))-(kd20*Cdc20A))*10
+    dCdc20i=((ks20_p+ks20_pp*CycB**n20/(J20**n20+CycB**n20))-(kd20*Cdc20i)-(Michaelis(APCP,Ja20,ka20,Cdc20i))+(Michaelis(1.0,Ji20,ki20,Cdc20A)))*10
+    dCdh1=((Michaelis(Vah1,Jah1,1.0,Cdh1i))-(Michaelis(Vih1,Jih1,1.0,Cdh1)))*10
+    dCKI=(-(kassb*CycB*CKI)+(kdissb*BCKI)-(kassb*pB*CKI)+(kdissb*pBCKI)+(Vdb*BCKI)+(Vdb*pBCKI)+(Vsi)-(Vdi*CKI)-(kassa*CKI*CycA)+(kdissa*TriA)+(Vda*TriA)-(kasse*CKI*CycE)+(kdisse*TriE)+(Vde*TriE))*10
+    dMass=(mu*Mass*(1-Mass/MaxMass))*10
+    dpB=(-(V25*pB)+(Vwee*CycB)-(Vdb*pB)-(kassb*pB*CKI)+(kdissb*pBCKI)+(Vdi*pBCKI))*10
+    dpBCKI=((kassb*pB*CKI)-(kdissb*pBCKI)-(V25*pBCKI)+(Vwee*BCKI)-(Vdb*pBCKI)-(Vdi*pBCKI))*10
+    dTriA=((kassa*CKI*CycA)-(kdissa*TriA)-(Vdi*TriA)-(Vda*TriA))*10
+    dTriE=((kasse*CKI*CycE)-(kdisse*TriE)-(Vdi*TriE)-(Vde*TriE))*10
+    dWee1=((Michaelis(Cdc14,Jawee,kawee,Wee1i))-(Michaelis(CycB,Jiwee,kiwee,Wee1)))*10*1
+    ds = [dCycA,dCycB,dCycE,dAPCP,dBCKI,dCdc20A,dCdc20i,dCdh1,dCKI,dMass,dpB,dpBCKI,dTriA,dTriE,dWee1]
+    return ds
+
+# Run the simulations
+Wee1_t=[0]
+params=params1
+G1_end,S_end,G2_end,M_end=[],[],[],[]
+s0 = [CycA0,CycB0,CycE0,APCP0,BCKI0,Cdc20A0,Cdc20i0,Cdh10,CKI0,Mass0,pB0,pBCKI0,TriA0,TriE0,Wee10]
+t_obs0,dCycA_obs0,dCycB_obs0,dCycE_obs0,dAPCP_obs0,dBCKI_obs0,dCdc20A_obs0,dCdc20i_obs0,dCdh1_obs0,dCKI_obs0,dMass_obs0,dpB_obs0,dpBCKI_obs0,dTriA_obs0,dTriE_obs0,dWee1_obs0=[],[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
+# run simulation
+t_box = np.arange(0, 120, 0.03)
+for i in t_box[1:]:
+    # Time observation
+    t_start = i-0.03
+    t_end = i
+    t_obs = np.linspace(t_start, t_end, 100)
+    # Run simulations
+    s_obs = odeint(sdot,s0,t_obs,args=(params,) ) 
+    dCycA_obs = s_obs[:,0]
+    dCycB_obs = s_obs[:,1]
+    dCycE_obs = s_obs[:,2]
+    dAPCP_obs = s_obs[:,3]
+    dBCKI_obs = s_obs[:,4]
+    dCdc20A_obs = s_obs[:,5]
+    dCdc20i_obs = s_obs[:,6]
+    dCdh1_obs = s_obs[:,7]
+    dCKI_obs = s_obs[:,8]
+    dMass_obs = s_obs[:,9]
+    dpB_obs = s_obs[:,10]
+    dpBCKI_obs = s_obs[:,11]
+    dTriA_obs = s_obs[:,12]
+    dTriE_obs = s_obs[:,13]
+    dWee1_obs = s_obs[:,14]
+    ### Reset the parameters and initial conditions
+    #S begins (and G1 ends) when Cyclin E > 0.55 (from below)
+    #G2 begins (and S ends) when Wee1 < 0.6 (from below)
+    #M begins (and G2 ends) when Cyclin A < 0.99 (decreasing from >0.99) (think this may have just been 1, not sure why I left this value).
+    #Cell divides (M ends) when Cyclin B < 0.2 (decreasing from above) – this is edited from Csikasz-Nagy’s value of 0.3. Cyclin B falls so fast that it doesn’t really matter.
+    params = [kassa,kdissa,Vdi,Vsa,Vda,Vsb,Vdb,V25,Vwee,kassb,kdissb,kasse,kdisse,Vse,Vde,Jaie,kaie,APC,Jiie,kiie,Ja20,ka20,Ji20,ki20,kd20,ks20_p,ks20_pp,n20,J20,Vah1,Jah1,Cdh1i,Vih1,Jih1,Vsi,mu,MaxMass]
+    for i in range(1,len(dCycB_obs)):
+        if dWee1_obs[i-1]>0.600 and dWee1_obs[i]<0.600:
+            S_end.append(t_obs[i])
+        elif dCycE_obs[i-1]<0.55 and dCycE_obs[i]>0.55:
+            G1_end.append(t_obs[i])
+        elif dCycA_obs[i-1]>0.99 and dCycA_obs[i]<0.99:
+            G2_end.append(t_obs[i])
+        elif dCycB_obs[i-1]>KEZ and dCycB_obs[i]<KEZ:
+            s0 = [dCycA_obs[-1],dCycB_obs[-1],dCycE_obs[-1],dAPCP_obs[-1],dBCKI_obs[-1],dCdc20A_obs[-1],dCdc20i_obs[-1],dCdh1_obs[-1],dCKI_obs[-1],0.5*dMass_obs[-1],dpB_obs[-1],dpBCKI_obs[-1],dTriA_obs[-1],dTriE_obs[-1],dWee1_obs[-1]]
+            M_end.append(t_obs[i])
+            print('Divission time (h) =',t_obs[i])
+            print('CycA0 =',CycA, 'CycB0 =',CycB,'CycE0 =',CycE,'APCP0 =',APCP,'BCKI0 =',BCKI,'Cdc20A0 =',Cdc20A,'Cdc20i0 =',Cdc20i,'Cdh10 =',Cdh1,'CKI0 =',CKI,'Mass0 =',Mass*0.5,'pB0 =',pB,'pBCKI0 =',pBCKI,'TriA0 =',TriA,'TriE0 =',TriE,'Wee10 =',Wee1)
+            print (Vsi)
+            break
+        else:
+            s0 = [dCycA_obs[-1],dCycB_obs[-1],dCycE_obs[-1],dAPCP_obs[-1],dBCKI_obs[-1],dCdc20A_obs[-1],dCdc20i_obs[-1],dCdh1_obs[-1],dCKI_obs[-1],dMass_obs[-1],dpB_obs[-1],dpBCKI_obs[-1],dTriA_obs[-1],dTriE_obs[-1],dWee1_obs[-1]]
+    t_obs0 = np.concatenate((t_obs0,t_obs))
+    dCycA_obs0 = np.concatenate((dCycA_obs0,dCycA_obs))
+    dCycB_obs0 = np.concatenate((dCycB_obs0,dCycB_obs))
+    dCycE_obs0 = np.concatenate((dCycE_obs0,dCycE_obs))
+    dAPCP_obs0 = np.concatenate((dAPCP_obs0,dAPCP_obs))
+    dBCKI_obs0 = np.concatenate((dBCKI_obs0,dBCKI_obs))
+    dCdc20A_obs0 = np.concatenate((dCdc20A_obs0,dCdc20A_obs))
+    dCdc20i_obs0 = np.concatenate((dCdc20i_obs0,dCdc20i_obs))
+    dCdh1_obs0 = np.concatenate((dCdh1_obs0,dCdh1_obs))
+    dCKI_obs0 = np.concatenate((dCKI_obs0,dCKI_obs))
+    dMass_obs0 = np.concatenate((dMass_obs0,dMass_obs))
+    dpB_obs0 = np.concatenate((dpB_obs0,dpB_obs))
+    dpBCKI_obs0 = np.concatenate((dpBCKI_obs0,dpBCKI_obs))
+    dTriA_obs0 = np.concatenate((dTriA_obs0,dTriA_obs))
+    dTriE_obs0 = np.concatenate((dTriE_obs0,dTriE_obs))
+    dWee1_obs0 = np.concatenate((dWee1_obs0,dWee1_obs))
+
+# Measure phase durations
+ind = min(np.size(G1_end),np.size(S_end),np.size(G2_end),np.size(M_end))
+G1_duration_box,S_duration_box,G2_duration_box,M_duration_box = [],[],[],[]
+for i in range(0,ind):
+    S_duration_box.append(S_end[i]-G1_end[i])
+    G2_duration_box.append(G2_end[i]-S_end[i])
+    M_duration_box.append(M_end[i]-G2_end[i])
+    if i>0:
+        G1_duration_box.append(G1_end[i]-M_end[i-1])
+G1 = np.mean(G1_duration_box)
+S = np.mean(S_duration_box)
+G2 = np.mean(G2_duration_box)
+M = np.mean(M_duration_box)
+#print (G1_duration_box)
+#print (S_duration_box)
+#print (G2_duration_box)
+#print (M_duration_box)
+print('The duration of G1 phase is',G1,'h.')
+print('The duration of S phase is',S,'h.')
+print('The duration of G2 phase is',G2,'h.')
+print('The duration of M phase is',M,'h.')
+print('The first cell cyle phases duration and period:',G1_end[0],S_end[0]-G1_end[0],G2_end[0]-S_end[0],M_end[0]-G2_end[0],M_end[0])
+print(G1_duration_box)
+print(S_duration_box)
+print(G2_duration_box)
+print(M_duration_box)
+
+# Plot
+dCKIT_obs0 = []
+for i in range(0,len(dCKI_obs0)):
+    dCKIT_obs0.append(dCKI_obs0[i]+dBCKI_obs0[i]+dpBCKI_obs0[i]+dTriA_obs0[i]+dTriE_obs0[i])
+import matplotlib.font_manager as font_manager
+fig = plt.figure(figsize=(12, 9), dpi=600)
+ax = fig.add_subplot(1,1,1)
+ax.minorticks_on() #turn on sub-tick
+plt.tick_params(which='both',top=True,bottom=True,left=True,right=True)
+plt.yticks(fontproperties='Helvetica', size=18, weight='normal')
+plt.xticks(fontproperties='Helvetica', size=18, weight='normal')
+plt.rcParams['xtick.direction']='in' # tick direction
+plt.rcParams['ytick.direction']='in'
+plt.grid(c='gainsboro',linestyle='--')
+ax.set_xlabel('Time (h)',fontproperties='Helvetica', size=22, weight='normal')
+ax.set_ylabel('Concentration (a.u.)',fontproperties='Helvetica', size=22, weight='normal')
+ax.set_title('')
+#ax.plot(t_obs0/10, dCdh1_obs0/np.float64(Mass0), '-',label='Cdh1',color='firebrick', linewidth=1.8)
+ax.plot(t_obs0, dCycA_obs0, '-',label='CycA',color='darkgray',linewidth=1.8)
+ax.plot(t_obs0, dCycB_obs0, '-',label='CycB',color='k', linewidth=1.8)
+ax.plot(t_obs0, dCycE_obs0, '-',label='CycE',color='g', linewidth=1.8)
+ax.plot(t_obs0, dMass_obs0/Mass0, '-',label='Mass',color='#4169E1', linewidth=1.8)
+ax.plot(t_obs0, dCKI_obs0, '-',label='p27',color='darkorange', linewidth=1.8)
+#ax.plot(np.array(Wee1_t),Wee1_box,'-',label='Wee1',color='r', linewidth=1.8)
+ax.plot(t_obs0,dWee1_obs0,'-',label='Wee1',color='r', linewidth=1.8)
+#ax.plot(t_obs0,dCdh1_obs0,'-',label='Cdh1',color='b', linewidth=1.8)
+ax.set_xticks(np.arange(0,51,24))
+ax.set_xlim(0,50)
+ax.set_ylim(-0.05,4)
+#ax.spines['right'].set_visible(False)	#remove right
+#ax.spines['top'].set_visible(False)	#remove top
+ax.spines['right'].set_linewidth(1)
+ax.spines['top'].set_linewidth(1)
+ax.spines['left'].set_linewidth(1)
+ax.spines['bottom'].set_linewidth(1)
+font = font_manager.FontProperties(family='Helvetica',
+                                   weight='normal',
+                                   style='normal', size=15)
+ax.legend(prop=font, frameon=True, loc='best',edgecolor='k',facecolor='w')
+#plt.annotate('1 PF on G1/S & 2 PF on G2/M',xy=(120,0.9),xycoords='data',textcoords='data',xytext=(+103,+1.105),fontsize = 16,weight='normal',family='Helvetica')
+plt.savefig('M3-normal 1 cycle.png',dpi=600)
