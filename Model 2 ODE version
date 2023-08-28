@@ -1,0 +1,222 @@
+import numpy as np  
+import matplotlib.pyplot as plt  
+from scipy.integrate import odeint  
+import math
+from scipy.signal import find_peaks
+
+# define the model
+def sdot(s,t,params):
+    a,u,Cdc20tot,E2Ftot,GF,Metot,Matot,Mbtot,Kdd,Kgf,K1e2f,K2e2f,K1Me,K2Me,K1Ma,K2Ma,K1Mb,K2Mb,K1Cdc20,K2Cdc20,Kie,Vdd,Vsd,V1Cdc20,V2Cdc20,V1e2f,V2e2f,V1Me,V2Me,V1Ma,V2Ma,V1Mb,V2Mb,b1,b2,Kib = params 
+    Md, E2F, Me, Ma, Mb, Cdc20 = s
+    
+    dMd = (Vsd*GF/(Kgf+GF)-Vdd*Md/(Kdd+Md))*u
+    dE2F = (V1e2f*(E2Ftot-E2F)/(K1e2f+E2Ftot-E2F)*(Md+Me)-V2e2f*E2F/(K2e2f+E2F)*Ma)*u
+    dMe = (V1Me*E2F*(a+b1*Me)*(Metot-Me)/(K1Me+Metot-Me)-V2Me*Ma*Me/(K2Me+Me))*u
+    dMa = (V1Ma*E2F*(Matot-Ma)/(K1Ma+Matot-Ma)-V2Ma*Cdc20*Ma/(K2Ma+Ma))*u
+    dMb = (V1Mb*Ma*(a+b2*Mb)*Kie/(Kie+Me)*(Mbtot-Mb)/(K1Mb+Mbtot-Mb)-V2Mb*Kib/(Kib+Mb)*Cdc20*Mb/(K2Mb+Mb))*u
+    dCdc20 = (V1Cdc20*Mb*(Cdc20tot-Cdc20)/(K1Cdc20+Cdc20tot-Cdc20)-V2Cdc20*Cdc20/(K2Cdc20+Cdc20))*u
+    
+    
+    
+    ds = [dMd, dE2F, dMe, dMa, dMb, dCdc20]
+    return ds
+
+# Parameter values
+a = 1
+u = 0.3
+Cdc20tot = 1
+E2Ftot = 1
+GF = 1
+Metot = 1
+Matot = 1
+Mbtot = 1
+Kdd = 0.1
+Kgf = 0.1
+K1e2f = 0.1
+K2e2f = 0.1
+K1Me = 0.1
+K2Me = 0.1
+K1Ma = 0.1
+K2Ma = 0.1
+K1Mb = 0.1
+K2Mb = 0.1
+K1Cdc20 = 0.1
+K2Cdc20 = 0.1
+Kie = 0.2
+Vdd = 0.245
+Vsd = 0.175
+V1Cdc20 = 1.8
+V2Cdc20 = 0.6
+V1e2f = 0.4
+V2e2f = 0.7
+V1Me = 1.1
+V2Me = 1.6
+V1Ma = 0.6
+V2Ma = 0.6
+V1Mb = 1
+V2Mb = 0.8
+b1 = 0
+b2 = 0
+Kib = 1000
+# b1, b2, Kib = (no PF)0,0,1000; (1PF)1,0,1000; (3PF)1,1,0.5.
+params = [a,u,Cdc20tot,E2Ftot,GF,Metot,Matot,Mbtot,Kdd,Kgf,K1e2f,K2e2f,K1Me,K2Me,K1Ma,K2Ma,K1Mb,K2Mb,K1Cdc20,K2Cdc20,Kie,Vdd,Vsd,V1Cdc20,V2Cdc20,V1e2f,V2e2f,V1Me,V2Me,V1Ma,V2Ma,V1Mb,V2Mb,b1,b2,Kib]
+
+# Initial conditions
+Md0 = 0.15
+E2F0 = 0.15
+Me0 = 0.075
+Ma0 = 0.25
+Mb0 = 0.15
+Cdc200 = 0.15
+s0 = [Md0, E2F0, Me0, Ma0, Mb0, Cdc200]
+
+# Time observation
+t_start = 0
+t_mid = 120
+t_end = 450
+t_obs1 = np.linspace(t_start, t_mid, t_end*1000)
+t_obs2 = np.linspace(t_mid, t_end, t_end*1000)
+
+# run simulation 1
+s_obs1 = odeint(sdot,s0,t_obs1,args=(params,) ) 
+dMd_obs1 = s_obs1[:,0]
+dE2F_obs1 = s_obs1[:,1]
+dMe_obs1 = s_obs1[:,2]
+dMa_obs1 = s_obs1[:,3]
+dMb_obs1 = s_obs1[:,4]
+dCdc20_obs1 = s_obs1[:,5]
+
+# reset the parameters
+b1 = 1
+b2 = 0
+Kib = 1000
+params = [a,u,Cdc20tot,E2Ftot,GF,Metot,Matot,Mbtot,Kdd,Kgf,K1e2f,K2e2f,K1Me,K2Me,K1Ma,K2Ma,K1Mb,K2Mb,K1Cdc20,K2Cdc20,Kie,Vdd,Vsd,V1Cdc20,V2Cdc20,V1e2f,V2e2f,V1Me,V2Me,V1Ma,V2Ma,V1Mb,V2Mb,b1,b2,Kib]
+
+# reset the initial conditions
+Md0 = dMd_obs1[-1] #
+E2F0 = dE2F_obs1[-1] #
+Me0 = dMe_obs1[-1]
+Ma0 = dMa_obs1[-1]
+Mb0 = dMb_obs1[-1]
+Cdc200 = dCdc20_obs1[-1] #
+s0 = [Md0, E2F0, Me0, Ma0, Mb0, Cdc200]
+
+# run simulation2
+s_obs2 = odeint(sdot,s0,t_obs2,args=(params,) ) 
+dMd_obs2 = s_obs2[:,0]
+dE2F_obs2 = s_obs2[:,1]
+dMe_obs2 = s_obs2[:,2]
+dMa_obs2 = s_obs2[:,3]
+dMb_obs2 = s_obs2[:,4]
+dCdc20_obs2 = s_obs2[:,5]
+t_obs = np.concatenate((t_obs1, t_obs2))
+dMd_obs = np.concatenate((dMd_obs1, dMd_obs2))
+dE2F_obs = np.concatenate((dE2F_obs1, dE2F_obs2))
+dMe_obs = np.concatenate((dMe_obs1, dMe_obs2))
+dMa_obs = np.concatenate((dMa_obs1, dMa_obs2))
+dMb_obs = np.concatenate((dMb_obs1, dMb_obs2))
+dCdc20_obs = np.concatenate((dCdc20_obs1, dCdc20_obs2))
+
+### estimate the period and amplitude
+from scipy.signal import find_peaks
+peake,_ = find_peaks(dMe_obs, height=0.1)
+peakb,_ = find_peaks(dMb_obs, height=0.1)
+troughe, _= find_peaks(-dMe_obs)
+troughb, _= find_peaks(-dMb_obs)
+# period
+from scipy.signal import peak_prominences
+pro_pe = peak_prominences(dMe_obs, peake)
+distance_pe = t_obs[pro_pe[2][1:]]
+for i in range(0, len(distance_pe)):
+    period_pe = distance_pe[i]-distance_pe[i-1]
+    #print (period_pe, end=' , ')
+#print ('\n')
+pro_pb = peak_prominences(dMb_obs, peakb)
+distance_pb = t_obs[pro_pb[2][1:]]
+for i in range(0, len(distance_pb)):
+    period_pb = distance_pb[i]-distance_pb[i-1]
+    #print (period_pb, end=' , ')
+#print ('\n')
+pro_te = peak_prominences(dMe_obs, troughe)
+distance_te = t_obs[pro_te[2][1:]]
+for i in range(0, len(distance_te)):
+    period_te = distance_te[i]-distance_te[i-1]
+    #print (period_te, end=' , ')
+#print ('\n')
+pro_tb = peak_prominences(dMb_obs, troughb)
+distance_tb = t_obs[pro_tb[2][1:]]
+for i in range(0, len(distance_tb)):
+    period_tb = distance_tb[i]-distance_tb[i-1]
+    #print (period_tb, end=' , ')
+#print ('\n\n\n\n')
+#amplitude
+print ('Me amplitude')
+print('when t < 120 h')
+for i in range(1,5):
+    ampe = dMe_obs[peake[i]]-dMe_obs[troughe[i]]
+    print (ampe, end=' , ')
+print('\nwhen t > 120 h')
+for i in range(9,13):
+    ampe = dMe_obs[peake[i]]-dMe_obs[troughe[i]]
+    print (ampe, end=' , ')
+print ('\n')
+print ('Mb amplitude')
+print('when t < 120 h')
+for i in range(1,5):
+    ampb = dMb_obs[peakb[i]]-dMb_obs[troughb[i]]
+    print (ampb, end=' , ')
+print('\nwhen t > 120 h')
+for i in range(9,13):
+    ampe = dMb_obs[peake[i]]-dMb_obs[troughe[i]]
+    print (ampe, end=' , ')
+print ('\n\n\n')
+#period function
+print('period when t < 120 h')
+for i in range(1,5):
+    period = t_obs[peake[i+1]]-t_obs[peake[i]]
+    print (period)
+print('\nperiod when t > 120 h')
+for i in range(9,13):
+    period = t_obs[peake[i+1]]-t_obs[peake[i]]
+    print (period)
+
+# Plot
+import matplotlib.font_manager as font_manager
+fig = plt.figure(figsize=(12, 9), dpi=300)
+ax = fig.add_subplot(1,1,1)
+plt.tick_params(which='both',top=True,bottom=True,left=True,right=True)
+plt.yticks(fontproperties='Helvetica', size=18, weight='normal')
+plt.xticks(fontproperties='Helvetica', size=18, weight='normal')
+ax.minorticks_on() #turn on sub-tick
+plt.grid(c='gainsboro',linestyle='--')
+plt.rcParams['xtick.direction']='in' # tick direction
+plt.rcParams['ytick.direction']='in'
+ax.set_xlabel('Time (h)',fontproperties='Helvetica', size=22, weight='normal')
+ax.set_ylabel('Cyclin E/Cdk2'+'\n'+'and cyclin B/Cdk1',fontproperties='Helvetica', size=22, weight='normal')
+ax.set_title('')
+#ax.plot(t_obs, dMd_obs, '-',label='CyclinD / Cdk4-6',color='r', linewidth=1.8)
+#ax.plot(t_obs, dE2F_obs, '-',label='E2F',color='b')
+ax.plot(t_obs, dMe_obs, '-',label='Cyclin E/Cdk2',color='k', linewidth=1.8)
+#ax.plot(t_obs, dMa_obs, '-',label='CyclinA/Cdk2',color='g', linewidth=1.8)
+ax.plot(t_obs, dMb_obs, '-',label='Cyclin B/Cdk1',color='#4169E1', linewidth=1.8)
+#ax.plot(t_obs, dCdc20_obs, '-',label='Cdc20',color='firebrick', linewidth=1.8)
+ax.plot(t_obs[peake], dMe_obs[peake],"xk")
+ax.plot(t_obs[peakb], dMb_obs[peakb], "xr")
+ax.plot(t_obs[troughe], dMe_obs[troughe],"vk")
+ax.plot(t_obs[troughb], dMb_obs[troughb],"^r")
+ax.set_xticks(np.arange(0,301,60))
+ax.set_yticks(np.arange(0,1.21,0.4))
+ax.set_xlim(0,300)
+ax.set_ylim(-0.05,1.2)
+#ax.spines['right'].set_visible(False)	#remove right
+#ax.spines['top'].set_visible(False)	#remove top
+ax.spines['right'].set_linewidth(1)
+ax.spines['top'].set_linewidth(1)
+ax.spines['left'].set_linewidth(1)
+ax.spines['bottom'].set_linewidth(1)
+font = font_manager.FontProperties(family='Helvetica',
+                                   weight='normal',
+                                   style='normal', size=15)
+ax.legend(prop=font, frameon=True, loc='best',edgecolor='k',facecolor='w')
+plt.annotate('1 PF on G1/S',xy=(120,0.8),xycoords='data',textcoords='data',xytext=(+90,+1.05),fontsize = 22,weight='normal',family='Helvetica',arrowprops = dict(facecolor="k",headlength=10,headwidth=6,width=0.05))
+#plt.savefig('3f.png',dpi=300)
